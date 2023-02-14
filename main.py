@@ -1,38 +1,96 @@
 import os
+import signal
 import sys
+import traceback
 import urllib.request
 
-from PySide2.QtCore import QSize, Qt
+from PyQt5.QtCore import pyqtSignal, pyqtSlot
+from PySide2.QtCore import QSize, Qt, QRunnable, QObject, QThreadPool, Signal
 from PySide2.QtGui import QPixmap
 from PySide2.QtWidgets import QApplication, QWidget, QMainWindow, QPushButton, QGridLayout, QLabel, \
-    QScrollArea, QHBoxLayout, QProgressDialog
-import threading
-
+    QScrollArea, QHBoxLayout, QDialog, QProgressBar, QProgressDialog
+from PySide2.QtCore import QTimer, QRunnable, Slot, Signal, QObject, QThreadPool
 from SteamAppAPI import SteamApp
+
+
+# Thanks to pythonguis.com for this multi-threaded modular solution!
+class WorkerSignals(QObject):
+    finished = Signal()
+    error = Signal(tuple)
+    # Use to return grid item
+    result = Signal(object)
+    # Use progress to update based on number of games loaded already
+
+
+class Worker(QRunnable):
+    def __init__(self, function, *args, **kwargs):
+        super(Worker, self).__init__()
+        self.running_function = function
+        self.args = args
+        self.kwargs = kwargs
+        self.signals = WorkerSignals()
+
+    @pyqtSlot()
+    def run(self):
+        try:
+            print("Try")
+            self.running_function(*self.args, **self.kwargs)
+        except:
+            print("error")
+            traceback.print_exc()
+            exctype, value = sys.exc_info()[:2]
+            self.signals.error.emit((exctype, value, traceback.format_exc()))
+        finally:
+            print("Finally")
+            self.signals.finished.emit()
 
 
 # It creates a window with a scrollable grid of images.
 class ScreenshotBrowser(QMainWindow):
 
     def __init__(self, steam_user_id):
+        # Declarations
         self.grid = None
+        self.loading_box = None
         self.steam_user_id = str(steam_user_id)
-        self.steam_screenshot_path = "C:/Program Files (x86)/Steam/userdata/" + self.steam_user_id + "/760/remote/"
+        self.steam_screenshot_path = f"C:/Program Files (x86)/Steam/userdata/{self.steam_user_id}/760/remote/"
         super().__init__()
 
+        # Main Window Attributes
         self.setWindowTitle("Sing's Screenshot Browser")
         self.setMinimumSize(1920, 1080)
         self.setAutoFillBackground(True)
 
+        # Makes the background look better
         palette = self.palette()
         palette.setColor(self.backgroundRole(), Qt.black)
         self.setPalette(palette)
 
+        # Start Loading Box
+        self.loading_box = QProgressDialog()
+        self.loading_box.setLabelText("Loading, please wait.")
+        self.loading_bar = QProgressBar()
+        self.loading_box.setBar(self.loading_bar)
+        self.loading_box.setMinimum(0)
+        self.loading_box.setMaximum(len(self.get_app_ids_from_screenshot_folder()))
 
+        #self.render_ui()
 
+        self.loading_box.show()
 
-        self.render_ui()
+        self.threadpool = QThreadPool()
+        self.start_render_thread()
+        #self.render_ui()
+    def loading_complete(self):
+        self.loading_box.close()
         self.show()
+
+    def start_render_thread(self):
+        self.worker = Worker(function=self.render_ui)
+        self.worker.signals.result.connect(self.render_ui)
+        self.worker.signals.finished.connect(self.loading_complete)
+        self.threadpool.start(self.worker)
+
 
 
 
@@ -65,7 +123,6 @@ class ScreenshotBrowser(QMainWindow):
         self.grid.setContentsMargins(10, 10, 10, 10)
         self.build_home_grid()
 
-
         # Kinda like a parenting thing. Adds widget to grid, and sets the box to the main layout
         widget.setLayout(self.grid)
         self.setLayout(hbox)
@@ -75,6 +132,7 @@ class ScreenshotBrowser(QMainWindow):
 
     def build_home_grid(self):
         row, col = 0, 0
+        counter = 0
         for x in self.get_app_ids_from_screenshot_folder():
             steam_api = SteamApp(x)
             label = QLabel()
@@ -89,16 +147,16 @@ class ScreenshotBrowser(QMainWindow):
             if col == 5:
                 row += 1
                 col = 0
+            counter += 1
 
-    def load_pixmap_for_home(self, steam_api):
+    @staticmethod
+    def load_pixmap_for_home(steam_api):
         img_path = "cache/image_cache/" + str(steam_api.get("name").replace(":", "")) + "_header.jpg"
         if not os.path.exists(img_path):
             header_link = steam_api.get("header_image")
             urllib.request.urlretrieve(header_link, img_path)
             print(img_path)
         return img_path
-
-
 
     def build_game_grid(self, app_id):
         screenshot_paths = self.load_screenshots_for_game(str(app_id))
@@ -122,23 +180,19 @@ class ScreenshotBrowser(QMainWindow):
         """
         It takes a Steam directory and an app_id, and returns a list of paths to all the screenshots for that game
 
-        :param steam_dir: The path to your Steam directory
         :param app_id: The Steam App ID of the game you want to get the screenshots for
         :return: A list of paths to the screenshots for a given game.
         """
         paths_list = []
-        full_path = self.steam_screenshot_path + "/" + app_id + "/screenshots"
+        full_path = f"{self.steam_screenshot_path}/{app_id}/screenshots"
         for file in os.listdir(full_path):
-            file_path = full_path + "/" + file
+            file_path = f"{full_path}/{file}"
             paths_list.append(file_path)
 
         return paths_list
 
     def get_app_ids_from_screenshot_folder(self):
-        app_ids = []
-        for x in os.listdir(self.steam_screenshot_path):
-            app_ids.append(x)
-        return app_ids
+        return list(os.listdir(self.steam_screenshot_path))
 
     # Layout resize event
     def resizeEvent(self, event):
@@ -167,17 +221,6 @@ class ScreenshotBrowser(QMainWindow):
         for x in range(self.grid.count()):
             cell = self.grid.itemAt(x)
             cell.widget().setFixedSize(size)
-
-
-class TestClass:
-    def __init__(self):
-        print("Initialized")
-
-    def get_app_ids_from_screenshot_folder(self, steam_user_id, steam_screenshot_dir):
-        app_ids = []
-        for x in os.listdir(steam_screenshot_dir):
-            app_ids.append(x)
-        return app_ids
 
 
 if __name__ == "__main__":
