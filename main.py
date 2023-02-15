@@ -4,7 +4,6 @@ import sys
 import traceback
 import urllib.request
 
-from PyQt5.QtCore import pyqtSignal, pyqtSlot
 from PySide2.QtCore import QSize, Qt, QRunnable, QObject, QThreadPool, Signal
 from PySide2.QtGui import QPixmap
 from PySide2.QtWidgets import QApplication, QWidget, QMainWindow, QPushButton, QGridLayout, QLabel, \
@@ -32,7 +31,7 @@ class Worker(QRunnable, QObject):
 
         self.kwargs['progress'] = self.signals.progress
 
-    @pyqtSlot()
+    @Slot()
     def run(self):
         try:
             print("Try")
@@ -77,9 +76,9 @@ class ScreenshotBrowser(QMainWindow):
         self.setAutoFillBackground(True)
 
         # Makes the background look better
-        palette = self.palette()
-        palette.setColor(self.backgroundRole(), Qt.black)
-        self.setPalette(palette)
+        # palette = self.palette()
+        # palette.setColor(self.backgroundRole(), Qt.black)
+        # self.setPalette(palette)
 
         # Start Loading Box
         print("1")
@@ -122,7 +121,7 @@ class ScreenshotBrowser(QMainWindow):
     def set_progress_bar(self, value):
         self.loading_box.setValue(value)
 
-    def render_ui(self):
+    def placeholder(self):
         # Defining the UI Elements and their layouts
         print("6")
 
@@ -164,9 +163,7 @@ class ScreenshotBrowser(QMainWindow):
                 row += 1
                 col = 0
 
-        print("Grid items after loop: ",self.grid.count())
-
-
+        print("Grid items after loop: ", self.grid.count())
 
         # Kinda like a parenting thing. Adds widget to grid, and sets the box to the main layout
         self.main_widget.setLayout(self.grid)
@@ -181,7 +178,13 @@ class ScreenshotBrowser(QMainWindow):
         self.main_widget.setVisible(True)
         print(self.main_widget.isVisible())
 
-
+    def render_ui(self):
+        test_label = QLabel()
+        test_label.setText("I am a testing label")
+        test_label.setAutoFillBackground(True)
+        box = QHBoxLayout()
+        box.addWidget(test_label)
+        self.setCentralWidget(test_label)
         self.show()
 
 
