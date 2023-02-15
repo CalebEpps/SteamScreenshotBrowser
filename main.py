@@ -17,12 +17,12 @@ from SteamAppAPI import SteamApp
 class WorkerSignals(QObject):
     finished = Signal()
     error = Signal(tuple)
-    # Use to return grid item
-    result = Signal(object)
     # Use progress to update based on number of games loaded already
+    progress = Signal(int)
+    result = Signal(object)
 
 
-class Worker(QRunnable):
+class Worker(QRunnable, QObject):
     def __init__(self, function, *args, **kwargs):
         super(Worker, self).__init__()
         self.running_function = function
@@ -30,16 +30,21 @@ class Worker(QRunnable):
         self.kwargs = kwargs
         self.signals = WorkerSignals()
 
+        self.kwargs['progress'] = self.signals.progress
+
     @pyqtSlot()
     def run(self):
         try:
             print("Try")
-            self.running_function(*self.args, **self.kwargs)
+            result = self.running_function(*self.args, **self.kwargs)
         except:
             print("error")
             traceback.print_exc()
             exctype, value = sys.exc_info()[:2]
             self.signals.error.emit((exctype, value, traceback.format_exc()))
+        else:
+            print("else")
+            self.signals.result.emit(result)
         finally:
             print("Finally")
             self.signals.finished.emit()
@@ -49,12 +54,22 @@ class Worker(QRunnable):
 class ScreenshotBrowser(QMainWindow):
 
     def __init__(self, steam_user_id):
+        super().__init__()
         # Declarations
+        self.title_label = None
+        self.scroll_area = None
+        self.worker = None
+        self.threadpool = None
+        self.hbox = QHBoxLayout()
+        self.labels = None
         self.grid = None
-        self.loading_box = None
+        # Widgets holds scroll area (assigned in render_ui())
+        self.main_widget = QWidget()
+        self.loading_box = QProgressDialog()
+        self.loading_bar = QProgressBar()
+        self.counter_test = 0
         self.steam_user_id = str(steam_user_id)
         self.steam_screenshot_path = f"C:/Program Files (x86)/Steam/userdata/{self.steam_user_id}/760/remote/"
-        super().__init__()
 
         # Main Window Attributes
         self.setWindowTitle("Sing's Screenshot Browser")
@@ -67,74 +82,126 @@ class ScreenshotBrowser(QMainWindow):
         self.setPalette(palette)
 
         # Start Loading Box
-        self.loading_box = QProgressDialog()
-        self.loading_box.setLabelText("Loading, please wait.")
-        self.loading_bar = QProgressBar()
-        self.loading_box.setBar(self.loading_bar)
-        self.loading_box.setMinimum(0)
-        self.loading_box.setMaximum(len(self.get_app_ids_from_screenshot_folder()))
-
-        #self.render_ui()
-
-        self.loading_box.show()
+        print("1")
+        self.loading_box_populator()
 
         self.threadpool = QThreadPool()
         self.start_render_thread()
-        #self.render_ui()
+        #print(f"Grid Item Count: {str(self.grid.count())}")
+
+        print("2")
+
     def loading_complete(self):
+        print("3")
         self.loading_box.close()
-        self.show()
+        print("4")
+        self.render_ui()
 
+
+        print("16")
     def start_render_thread(self):
-        self.worker = Worker(function=self.render_ui)
-        self.worker.signals.result.connect(self.render_ui)
+        self.worker = Worker(function=self.build_home_grid)
         self.worker.signals.finished.connect(self.loading_complete)
-        self.threadpool.start(self.worker)
+        self.worker.signals.result.connect(self.get_grid)
+        self.worker.signals.progress.connect(self.set_progress_bar)
+        self.threadpool.globalInstance().start(self.worker)
 
 
+    def loading_box_populator(self):
+        self.loading_box.setLabelText("Loading, please wait.")
+        self.loading_box.setBar(self.loading_bar)
+        self.loading_box.setMinimum(0)
+        self.loading_box.setMaximum(len(self.get_app_ids_from_screenshot_folder()))
+        self.loading_box.show()
 
+    def get_grid(self, list):
+        print(str(list))
+        self.labels = list
+        print(len(list))
+
+    def set_progress_bar(self, value):
+        self.loading_box.setValue(value)
 
     def render_ui(self):
         # Defining the UI Elements and their layouts
-        hbox = QHBoxLayout()
+        print("6")
 
         # Title label Init
-        title_label = QLabel("Sing's Screenshot Browser")
-        title_label.setAlignment(Qt.AlignCenter)
-        hbox.addWidget(title_label)
+        self.title_label = QLabel("Sing's Screenshot Browser")
+        self.title_label.setAlignment(Qt.AlignCenter)
+        self.hbox.addWidget(self.title_label)
+        print("7: ", self.hbox.isEmpty())
 
         # Q. Button Init
         quit_btn = QPushButton("Quit")
         # quit_btn.clicked.connect(self.close())
-        hbox.addWidget(quit_btn)
+        self.hbox.addWidget(quit_btn)
+        print("8")
 
         # Scroll Area Init
-        scroll_area = QScrollArea()
-        self.setCentralWidget(scroll_area)
+        self.scroll_area = QScrollArea()
+        self.setCentralWidget(self.scroll_area)
+
+        print("9")
 
         # Widget that holds the scroll area
-        widget = QWidget()
-        scroll_area.setWidget(widget)
-        scroll_area.setWidgetResizable(True)
-
+        self.scroll_area.setWidget(self.main_widget)
+        self.scroll_area.setWidgetResizable(True)
+        self.scroll_area.setVisible(True)
+        print("10")
         # Creation of image grid
-        self.grid = QGridLayout(widget)
+        self.grid = QGridLayout()
         self.grid.setSpacing(10)
         self.grid.setContentsMargins(10, 10, 10, 10)
-        self.build_home_grid()
+        print("11")
+
+        # Loop that adds returned values from different thread to the grid layout
+        row, col = 0, 0
+        for x in range(len(self.labels)):
+            self.grid.addWidget(self.labels[x], row, col)
+            col += 1
+            if col == 5:
+                row += 1
+                col = 0
+
+        print("Grid items after loop: ",self.grid.count())
+
+
 
         # Kinda like a parenting thing. Adds widget to grid, and sets the box to the main layout
-        widget.setLayout(self.grid)
-        self.setLayout(hbox)
+        self.main_widget.setLayout(self.grid)
+        print("12")
+        self.setLayout(self.hbox)
+        print(self.grid.isEmpty())
+        print(self.grid.isEnabled())
+        print(self.scroll_area.isEnabled())
+        print(self.scroll_area.isHidden())
+        print(self.scroll_area.isVisible())
+        print(self.main_widget.isVisible())
+        self.main_widget.setVisible(True)
+        print(self.main_widget.isVisible())
+
+
+        self.show()
+
+
 
     def show(self):
+        print("14")
         super().show()
+        print("15")
 
-    def build_home_grid(self):
+
+    def build_home_grid(self, progress):
+        labels = []
         row, col = 0, 0
         counter = 0
         for x in self.get_app_ids_from_screenshot_folder():
             steam_api = SteamApp(x)
+            try:
+                self.loading_box.setLabelText("Loading " + steam_api.get("name") + ". . .")
+            except:
+                print("issue")
             label = QLabel()
             pixmap = QPixmap(self.load_pixmap_for_home(steam_api))
             label.setPixmap(pixmap.scaled(600, 338, Qt.KeepAspectRatio, Qt.SmoothTransformation))
@@ -142,12 +209,14 @@ class ScreenshotBrowser(QMainWindow):
             label.setMaximumSize(300, 100)
             label.setMinimumSize(100, 100)
             label.setContentsMargins(5, 5, 5, 5)
-            self.grid.addWidget(label, row, col)
+            labels.append(label)
             col += 1
             if col == 5:
                 row += 1
                 col = 0
             counter += 1
+            progress.emit(counter)
+        return labels
 
     @staticmethod
     def load_pixmap_for_home(steam_api):
