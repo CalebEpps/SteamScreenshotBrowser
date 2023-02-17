@@ -17,12 +17,9 @@ class MyLabel(QLabel):
     def __init__(self):
         super().__init__()
 
-
-# Thanks to pythonguis.com for this multi-threaded modular solution!
 class WorkerSignals(QObject):
     finished = Signal()
     error = Signal(tuple)
-    # Use progress to update based on number of games loaded already
     progress = Signal(int)
     result = Signal(object)
 
@@ -88,10 +85,10 @@ class ScreenshotBrowser(QMainWindow):
         self.setPalette(palette)
 
         # Start Loading Box
-        self.loading_box_populator()
+        self.start_startup_loading_box()
 
         self.threadpool = QThreadPool()
-        self.start_labels_thread()
+        self.start_thread(funct=self.get_image_paths, finished_func=self.loading_complete, result_func=self.set_labels, progress_func=self.set_progress_bar)
         # print(f"Grid Item Count: {str(self.grid.count())}")
 
     def loading_complete(self):
@@ -112,6 +109,7 @@ class ScreenshotBrowser(QMainWindow):
             self.build_game_grid(self.titles[index])
         except IndexError:
             pass
+        self.resizeEvent(None)
 
 
 
@@ -122,22 +120,34 @@ class ScreenshotBrowser(QMainWindow):
             widget.deleteLater()
         try:
             self.build_home_grid()
+            self.resizeEvent(None)
         except IndexError:
             pass
 
-    def start_labels_thread(self):
-        self.worker = Worker(function=self.get_image_paths)
-        self.worker.signals.finished.connect(self.loading_complete)
-        self.worker.signals.result.connect(self.set_labels)
-        self.worker.signals.progress.connect(self.set_progress_bar)
+    def start_thread(self, funct, finished_func, result_func, progress_func,):
+        self.worker = Worker(function=funct)
+        self.worker.signals.finished.connect(finished_func)
+        self.worker.signals.result.connect(result_func)
+        self.worker.signals.progress.connect(progress_func)
         self.threadpool.globalInstance().start(self.worker)
 
-    def loading_box_populator(self):
+    def start_startup_loading_box(self):
+        self.loading_box.setLabelText("Loading, please wait.")
+        self.loading_box.setWindowTitle("Sing's Steam Photo Editor")
+        self.loading_box.setBar(self.loading_bar)
+        self.loading_box.setMinimum(0)
+        self.loading_box.setMaximum(len(self.get_app_ids_from_screenshot_folder()))
+        self.loading_box.show()
+
+    def start_screenshots_loading_box(self):
         self.loading_box.setLabelText("Loading, please wait.")
         self.loading_box.setBar(self.loading_bar)
         self.loading_box.setMinimum(0)
         self.loading_box.setMaximum(len(self.get_app_ids_from_screenshot_folder()))
         self.loading_box.show()
+
+
+
 
     def set_labels(self, labels):
         self.labels = labels
@@ -201,9 +211,7 @@ class ScreenshotBrowser(QMainWindow):
 
     def get_image_paths(self, progress):
         img_paths = []
-        counter = 0
-        for x in self.get_app_ids_from_screenshot_folder():
-            counter += 1
+        for counter, x in enumerate(self.get_app_ids_from_screenshot_folder(), start=1):
             steam_api = SteamApp(x)
             img_path = self.load_pixmap_for_home(steam_api)
             img_paths.append(img_path)
@@ -218,8 +226,8 @@ class ScreenshotBrowser(QMainWindow):
         for x in screenshot_paths:
             label = QLabel()
             pixmap = QPixmap(x)
+            label.setPixmap(pixmap.scaled(500, 300, Qt.KeepAspectRatio, Qt.SmoothTransformation))
             label.setScaledContents(True)
-            label.setPixmap(pixmap.scaled(400, 200, Qt.KeepAspectRatio, Qt.SmoothTransformation))
             self.home_grid.addWidget(label, row, col)
             col += 1
             if col == 4:
