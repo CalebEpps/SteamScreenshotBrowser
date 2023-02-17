@@ -105,9 +105,25 @@ class ScreenshotBrowser(QMainWindow):
         print(img_path)
 
         for x in reversed(range(self.home_grid.count())):
-            self.home_grid.itemAt(x).widget().setParent(None)
+            widget = self.home_grid.itemAt(x).widget()
+            widget.setParent(None)
+            widget.deleteLater()
+        try:
+            self.build_game_grid(self.titles[index])
+        except IndexError:
+            pass
 
-        self.build_game_grid(self.titles[index])
+
+
+    def back_btn_clicked(self):
+        for x in reversed(range(self.home_grid.count())):
+            widget = self.home_grid.itemAt(x).widget()
+            widget.setParent(None)
+            widget.deleteLater()
+        try:
+            self.build_home_grid()
+        except IndexError:
+            pass
 
     def start_labels_thread(self):
         self.worker = Worker(function=self.get_image_paths)
@@ -145,6 +161,7 @@ class ScreenshotBrowser(QMainWindow):
         hbox.addWidget(quit_btn)
 
         back_btn = QPushButton("Back")
+        back_btn.clicked.connect(self.back_btn_clicked)
         hbox.addWidget(back_btn)
 
         # Scroll Area Init
@@ -152,37 +169,24 @@ class ScreenshotBrowser(QMainWindow):
 
         # Widget that holds the scroll area
         scroll_area.setWidgetResizable(True)
-        scroll_area.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOn)
+        scroll_area.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
         scroll_area.setVisible(True)
         scroll_area.setEnabled(True)
         # Creation of image grid
         self.home_grid = QGridLayout()
-        self.home_grid.setSpacing(10)
         self.home_grid.setVerticalSpacing(10)
         self.home_grid.setContentsMargins(10, 10, 10, 10)
 
         # Loop that adds returned values from different thread to the grid layout
-        row, col, curr_item = 0, 0, 0
-        for x in self.labels:
-            label = QLabel()
-            pixmap = QPixmap(x)
-            label.setPixmap(pixmap.scaled(400, 200, Qt.KeepAspectRatio, Qt.SmoothTransformation))
-            label.setScaledContents(True)
-            label.setContentsMargins(5, 5, 5, 5)
-            label.mousePressEvent = partial(self.label_clicked, self.labels[curr_item])
-            self.home_grid.addWidget(label, row, col)
-            col += 1
-            curr_item += 1
-            if col == 5:
-                row += 1
-                col = 0
+        self.build_home_grid()
 
         #TODO: here add a nested loop that builds the ENTIRE thing from render_ui() again, including a widget that can be set as central. Then try to replace the ENTIRE thing.
         #If that doesn't work, then making everything class scoped and use the method you are now
 
         print("Grid items after loop: ", self.home_grid.count())
-
-        scroll_area.setLayout(self.home_grid)
+        scroll_widget = QWidget()
+        scroll_area.setWidget(scroll_widget)
+        scroll_widget.setLayout(self.home_grid)
 
         # Kinda like a parenting thing. Adds widget to grid, and sets the box to the main layout
         print(vbox.sizeConstraint())
@@ -215,14 +219,29 @@ class ScreenshotBrowser(QMainWindow):
             label = QLabel()
             pixmap = QPixmap(x)
             label.setScaledContents(True)
-            label.setMinimumSize(400, 200)
-            label.setContentsMargins(5, 5, 5, 5)
             label.setPixmap(pixmap.scaled(400, 200, Qt.KeepAspectRatio, Qt.SmoothTransformation))
             self.home_grid.addWidget(label, row, col)
             col += 1
             if col == 4:
                 row += 1
                 col = 0
+
+    def build_home_grid(self):
+        row, col, curr_item = 0, 0, 0
+        for x in self.labels:
+            label = QLabel()
+            pixmap = QPixmap(x)
+            label.setPixmap(pixmap.scaled(400, 200, Qt.KeepAspectRatio, Qt.SmoothTransformation))
+            label.setScaledContents(True)
+            label.setContentsMargins(5, 5, 5, 5)
+            label.mousePressEvent = partial(self.label_clicked, self.labels[curr_item])
+            self.home_grid.addWidget(label, row, col)
+            col += 1
+            curr_item += 1
+            if col == 4:
+                row += 1
+                col = 0
+
 
     @staticmethod
     def load_pixmap_for_home(steam_api):
@@ -282,9 +301,6 @@ class ScreenshotBrowser(QMainWindow):
             widget = item.widget()
             pixmap = widget.pixmap()
             height = pixmap.height()
-            print(height)
-            print(pixmap.width())
-            print(aspect_ratio)
             if height != 0:
                 aspect_ratio = max(aspect_ratio, pixmap.width() / height)
 
