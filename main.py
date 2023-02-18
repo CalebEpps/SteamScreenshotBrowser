@@ -12,12 +12,6 @@ from PySide2.QtWidgets import QApplication, QWidget, QMainWindow, QPushButton, Q
 
 from SteamAppAPI import SteamApp
 
-
-class MyLabel(QLabel):
-    def __init__(self):
-        super().__init__()
-
-
 class WorkerSignals(QObject):
     finished = Signal()
     error = Signal(tuple)
@@ -97,7 +91,7 @@ class ScreenshotBrowser(QMainWindow):
         self.loading_box.close()
         self.render_ui()
 
-    def label_clicked(self, img_path, event):
+    def header_clicked(self, img_path, event):
         print("Label Clicked")
         index = self.labels.index(img_path)
         print(self.titles[index])
@@ -113,6 +107,9 @@ class ScreenshotBrowser(QMainWindow):
             pass
         self.resizeEvent(None)
 
+    def img_clicked(self, img_path, event):
+        pass
+
     def back_btn_clicked(self):
         for x in reversed(range(self.home_grid.count())):
             widget = self.home_grid.itemAt(x).widget()
@@ -123,6 +120,8 @@ class ScreenshotBrowser(QMainWindow):
             self.resizeEvent(None)
         except IndexError:
             pass
+
+
 
     def start_thread(self, funct, finished_func, result_func, progress_func, ):
         self.worker = Worker(function=funct)
@@ -251,7 +250,7 @@ class ScreenshotBrowser(QMainWindow):
             label.setPixmap(pixmap.scaled(400, 200, Qt.KeepAspectRatio, Qt.SmoothTransformation))
             label.setScaledContents(True)
             label.setContentsMargins(5, 5, 5, 5)
-            label.mousePressEvent = partial(self.label_clicked, self.labels[curr_item])
+            label.mousePressEvent = partial(self.header_clicked, self.labels[curr_item])
             self.home_grid.addWidget(label, row, col)
             col += 1
             curr_item += 1
