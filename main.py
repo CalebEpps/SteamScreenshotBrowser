@@ -108,7 +108,7 @@ class ScreenshotBrowser(QMainWindow):
         self.resizeEvent(None)
 
     def img_clicked(self, img_path, event):
-        pass
+        print(img_path)
 
     def back_btn_clicked(self):
         for x in reversed(range(self.home_grid.count())):
@@ -236,6 +236,7 @@ class ScreenshotBrowser(QMainWindow):
             pixmap = QPixmap(x)
             label.setPixmap(pixmap.scaled(500, 300, Qt.KeepAspectRatio, Qt.SmoothTransformation))
             label.setScaledContents(True)
+            label.mousePressEvent = partial(self.img_clicked, x)
             self.home_grid.addWidget(label, row, col)
             col += 1
             if col == 4:
