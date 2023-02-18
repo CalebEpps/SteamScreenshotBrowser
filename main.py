@@ -17,6 +17,7 @@ class MyLabel(QLabel):
     def __init__(self):
         super().__init__()
 
+
 class WorkerSignals(QObject):
     finished = Signal()
     error = Signal(tuple)
@@ -78,7 +79,7 @@ class ScreenshotBrowser(QMainWindow):
 
         # Main Window Attributes
         self.setWindowTitle("Sing's Screenshot Browser")
-        self.setMinimumSize(1280,720)
+        self.setMinimumSize(1280, 720)
         # Makes the background look better
         palette = self.palette()
         palette.setColor(self.backgroundRole(), Qt.black)
@@ -88,10 +89,11 @@ class ScreenshotBrowser(QMainWindow):
         self.start_startup_loading_box()
 
         self.threadpool = QThreadPool()
-        self.start_thread(funct=self.get_image_paths, finished_func=self.loading_complete, result_func=self.set_labels, progress_func=self.set_progress_bar)
+        self.start_thread(funct=self.get_img_header_paths, finished_func=self.after_initial_load,
+                          result_func=self.set_labels, progress_func=self.set_progress_bar)
         # print(f"Grid Item Count: {str(self.grid.count())}")
 
-    def loading_complete(self):
+    def after_initial_load(self):
         self.loading_box.close()
         self.render_ui()
 
@@ -111,8 +113,6 @@ class ScreenshotBrowser(QMainWindow):
             pass
         self.resizeEvent(None)
 
-
-
     def back_btn_clicked(self):
         for x in reversed(range(self.home_grid.count())):
             widget = self.home_grid.itemAt(x).widget()
@@ -124,7 +124,7 @@ class ScreenshotBrowser(QMainWindow):
         except IndexError:
             pass
 
-    def start_thread(self, funct, finished_func, result_func, progress_func,):
+    def start_thread(self, funct, finished_func, result_func, progress_func, ):
         self.worker = Worker(function=funct)
         self.worker.signals.finished.connect(finished_func)
         self.worker.signals.result.connect(result_func)
@@ -146,14 +146,12 @@ class ScreenshotBrowser(QMainWindow):
         self.loading_box.setMaximum(len(self.get_app_ids_from_screenshot_folder()))
         self.loading_box.show()
 
-
-
-
     def set_labels(self, labels):
         self.labels = labels
 
     def set_progress_bar(self, value):
         self.loading_box.setValue(value)
+
     def render_ui(self):
         # Defining the UI Elements and their layouts
 
@@ -190,8 +188,8 @@ class ScreenshotBrowser(QMainWindow):
         # Loop that adds returned values from different thread to the grid layout
         self.build_home_grid()
 
-        #TODO: here add a nested loop that builds the ENTIRE thing from render_ui() again, including a widget that can be set as central. Then try to replace the ENTIRE thing.
-        #If that doesn't work, then making everything class scoped and use the method you are now
+        # TODO: here add a nested loop that builds the ENTIRE thing from render_ui() again, including a widget that can be set as central. Then try to replace the ENTIRE thing.
+        # If that doesn't work, then making everything class scoped and use the method you are now
 
         print("Grid items after loop: ", self.home_grid.count())
         scroll_widget = QWidget()
@@ -209,16 +207,27 @@ class ScreenshotBrowser(QMainWindow):
     def show(self):
         super().show()
 
-    def get_image_paths(self, progress):
-        img_paths = []
+    def get_img_header_paths(self, progress):
+        header_paths = []
         for counter, x in enumerate(self.get_app_ids_from_screenshot_folder(), start=1):
             steam_api = SteamApp(x)
             img_path = self.load_pixmap_for_home(steam_api)
-            img_paths.append(img_path)
+            header_paths.append(img_path)
 
             progress.emit(counter)
 
-        return img_paths
+        return header_paths
+
+    def get_screenshot_paths(self, progress):
+        screenshot_paths = []
+        for counter, x in enumerate(self.get_app_ids_from_screenshot_folder(), start=1):
+            steam_api = SteamApp(x)
+            img_path = self.load_pixmap_for_home(steam_api)
+            screenshot_paths.append(img_path)
+
+            progress.emit(counter)
+
+        return screenshot_paths
 
     def build_game_grid(self, app_id):
         screenshot_paths = self.load_screenshots_for_game(str(app_id))
@@ -250,7 +259,6 @@ class ScreenshotBrowser(QMainWindow):
                 row += 1
                 col = 0
 
-
     @staticmethod
     def load_pixmap_for_home(steam_api):
         img_path = "cache/image_cache/" + steam_api.get("name").replace(":", "") + "_header.jpg"
@@ -259,8 +267,6 @@ class ScreenshotBrowser(QMainWindow):
             urllib.request.urlretrieve(header_link, img_path)
             print(img_path)
         return img_path
-
-
 
     # Loads screenshot links from directory based on app id
     def load_screenshots_for_game(self, app_id):
