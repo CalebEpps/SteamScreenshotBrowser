@@ -12,7 +12,6 @@ from PySide2.QtWidgets import QApplication, QWidget, QMainWindow, QPushButton, Q
 
 from SteamAppAPI import SteamApp
 
-
 class WorkerSignals(QObject):
     finished = Signal()
     error = Signal(tuple)
@@ -59,7 +58,6 @@ class ScreenshotBrowser(QMainWindow):
         self.worker = None
         self.threadpool = None
         self.labels = None
-        self.curr_game_labels = None
 
         self.home_grid = None
         self.game_grid = None
@@ -123,8 +121,10 @@ class ScreenshotBrowser(QMainWindow):
         except IndexError:
             pass
 
-    def start_thread(self, funct, finished_func, result_func, progress_func, **kwargs):
-        self.worker = Worker(function=funct, **kwargs)
+
+
+    def start_thread(self, funct, finished_func, result_func, progress_func, ):
+        self.worker = Worker(function=funct)
         self.worker.signals.finished.connect(finished_func)
         self.worker.signals.result.connect(result_func)
         self.worker.signals.progress.connect(progress_func)
@@ -217,42 +217,31 @@ class ScreenshotBrowser(QMainWindow):
 
         return header_paths
 
-    def set_curr_game_labels(self, labels):
-        self.curr_game_labels = labels
+    def get_screenshot_paths(self, progress):
+        screenshot_paths = []
+        for counter, x in enumerate(self.get_app_ids_from_screenshot_folder(), start=1):
+            steam_api = SteamApp(x)
+            img_path = self.load_pixmap_for_home(steam_api)
+            screenshot_paths.append(img_path)
+
+            progress.emit(counter)
+
+        return screenshot_paths
 
     def build_game_grid(self, app_id):
         screenshot_paths = self.load_screenshots_for_game(str(app_id))
         row, col = 0, 0
-        self.loading_box.setMaximum(len(screenshot_paths))
-        self.start_thread(funct=self.get_screenshot_paths, result_func=self.set_curr_game_labels,
-                          progress_func=self.set_progress_bar, finished_func=self.populate_game_grid, app_id=app_id)
-
-    def get_screenshot_paths(self, progress, app_id):
-        screenshot_paths = self.load_screenshots_for_game(app_id)
-        labels = []
-        for counter, x in enumerate(screenshot_paths, start=1):
-            print(x)
+        for x in screenshot_paths:
             label = QLabel()
             pixmap = QPixmap(x)
             label.setPixmap(pixmap.scaled(500, 300, Qt.KeepAspectRatio, Qt.SmoothTransformation))
             label.setScaledContents(True)
             label.mousePressEvent = partial(self.img_clicked, x)
-            labels.append(label)
-
-            progress.emit(counter)
-
-        return labels
-
-    def populate_game_grid(self):
-        row, col = 0, 0
-        for x in self.curr_game_labels:
-            self.home_grid.addWidget(x, row, col)
+            self.home_grid.addWidget(label, row, col)
             col += 1
             if col == 4:
                 row += 1
                 col = 0
-        self.loading_box.close()
-        self.updateGeometry()
 
     def build_home_grid(self):
         row, col, curr_item = 0, 0, 0
