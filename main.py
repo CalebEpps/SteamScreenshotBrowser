@@ -6,10 +6,10 @@ from functools import partial
 
 from PySide2.QtCore import QRunnable, Slot, Signal, QObject, QThreadPool
 from PySide2.QtCore import QSize, Qt
-from PySide2.QtGui import QPixmap
+from PySide2.QtGui import QPixmap, QImage
 from PySide2.QtWidgets import QApplication, QWidget, QMainWindow, QPushButton, QGridLayout, QLabel, \
     QScrollArea, QHBoxLayout, QProgressBar, QProgressDialog, QVBoxLayout, QSizePolicy
-
+from EditorWindow import EditorWindow
 from SteamAppAPI import SteamApp
 
 class WorkerSignals(QObject):
@@ -108,7 +108,25 @@ class ScreenshotBrowser(QMainWindow):
         self.resizeEvent(None)
 
     def img_clicked(self, img_path, event):
+        label = QLabel()
+        label.setPixmap(QPixmap(img_path))
         print(img_path)
+        editor = self.setup_image_editor(img_path, 107410)
+        self.main_widget.setParent(None)
+        self.setCentralWidget(editor)
+
+    def setup_image_editor(self, img_path, app_id):
+        editor = EditorWindow(img_path, app_id)
+        editor.cancel_btn.clicked.connect(self.back_btn_clicked)
+        return editor
+
+
+        # NOT implemented, neither is create label below
+    def generate_qimage(self, img_path):
+        return QImage(img_path)
+
+    def create_label_for_curr_game(self, img):
+        pass
 
     def back_btn_clicked(self):
         for x in reversed(range(self.home_grid.count())):
@@ -117,6 +135,7 @@ class ScreenshotBrowser(QMainWindow):
             widget.deleteLater()
         try:
             self.build_home_grid()
+            self.setCentralWidget(self.main_widget)
             self.resizeEvent(None)
         except IndexError:
             pass
@@ -133,13 +152,6 @@ class ScreenshotBrowser(QMainWindow):
     def start_startup_loading_box(self):
         self.loading_box.setLabelText("Loading, please wait.")
         self.loading_box.setWindowTitle("Sing's Steam Photo Editor")
-        self.loading_box.setBar(self.loading_bar)
-        self.loading_box.setMinimum(0)
-        self.loading_box.setMaximum(len(self.get_app_ids_from_screenshot_folder()))
-        self.loading_box.show()
-
-    def start_screenshots_loading_box(self):
-        self.loading_box.setLabelText("Loading, please wait.")
         self.loading_box.setBar(self.loading_bar)
         self.loading_box.setMinimum(0)
         self.loading_box.setMaximum(len(self.get_app_ids_from_screenshot_folder()))
@@ -172,13 +184,13 @@ class ScreenshotBrowser(QMainWindow):
         hbox.addWidget(back_btn)
 
         # Scroll Area Init
-        scroll_area = QScrollArea()
+        self.scroll_area = QScrollArea()
 
         # Widget that holds the scroll area
-        scroll_area.setWidgetResizable(True)
-        scroll_area.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
-        scroll_area.setVisible(True)
-        scroll_area.setEnabled(True)
+        self.scroll_area.setWidgetResizable(True)
+        self.scroll_area.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        self.scroll_area.setVisible(True)
+        self.scroll_area.setEnabled(True)
         # Creation of image grid
         self.home_grid = QGridLayout()
         self.home_grid.setVerticalSpacing(10)
@@ -191,14 +203,14 @@ class ScreenshotBrowser(QMainWindow):
         # If that doesn't work, then making everything class scoped and use the method you are now
 
         print("Grid items after loop: ", self.home_grid.count())
-        scroll_widget = QWidget()
-        scroll_area.setWidget(scroll_widget)
-        scroll_widget.setLayout(self.home_grid)
+        self.scroll_widget = QWidget()
+        self.scroll_area.setWidget(self.scroll_widget)
+        self.scroll_widget.setLayout(self.home_grid)
 
         # Kinda like a parenting thing. Adds widget to grid, and sets the box to the main layout
         print(vbox.sizeConstraint())
         vbox.addLayout(hbox)
-        vbox.addWidget(scroll_area)
+        vbox.addWidget(self.scroll_area)
         self.main_widget.setLayout(vbox)
         self.setCentralWidget(self.main_widget)
         self.show()
@@ -303,10 +315,10 @@ class ScreenshotBrowser(QMainWindow):
         :param event: The event object that was passed to the event handler
         """
         size = self.centralWidget().size()
-        size -= QSize(20, 20)
-        size /= 5
-        size -= QSize(10, 10)
-        size -= QSize(10, 10)
+        size -= QSize(4, 4)
+        size /= 4.5
+        size -= QSize(4, 4)
+        size -= QSize(4, 4)
 
         # Calculate the maximum aspect ratio
         aspect_ratio = 0
