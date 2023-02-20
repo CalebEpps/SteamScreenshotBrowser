@@ -121,9 +121,9 @@ class EditorWindow(QWidget):
             for y in range(height):
                 # Creates new RGB value for sepia filter
                 rgb = QColor(new_image.pixelColor(x, y))
-                r = int(rgb.red() * .393) + int(rgb.green() * .769) + int(rgb.blue() * .189)
-                g = int(rgb.red() * .349) + int(rgb.green() * .686) + int(rgb.blue() * .168)
-                b = int(rgb.red() * .272) + int(rgb.green() * .534) + int(rgb.blue() * .131)
+                r = min(255, int(rgb.red() * .393) + int(rgb.green() * .769) + int(rgb.blue() * .189))
+                g = min(255, int(rgb.red() * .349) + int(rgb.green() * .686) + int(rgb.blue() * .168))
+                b = min(255, int(rgb.red() * .272) + int(rgb.green() * .534) + int(rgb.blue() * .131))
 
                 new_image.setPixel(x, y, qRgb(r, g, b))
 
