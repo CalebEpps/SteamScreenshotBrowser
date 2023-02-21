@@ -25,6 +25,9 @@ class EditorWindow(QWidget):
         # Declarations for image preview area
         self.original_image = None
         self.edited_image = None
+        self.opened_img = QImage(self.img_path).scaled(500, 300, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+        self.edited = QImage(self.img_path).scaled(500, 300, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+
         self.image_preview_layout = None
         # Declarations for editing grid area
         self.editor_grid = None
@@ -79,7 +82,7 @@ class EditorWindow(QWidget):
         # Dropdown Setup
         self.filter_dropdown = QComboBox()
         self.filter_dropdown.addItems(self.filters)
-        self.filter_dropdown.currentIndexChanged.connect(self.set_edited_photo_filter)
+        self.filter_dropdown.textActivated.connect(self.set_edited_photo_filter)
 
         self.editor_grid.addWidget(self.filter_label, 0, 0)
         self.editor_grid.addWidget(self.filter_dropdown, 0, 1)
@@ -112,36 +115,35 @@ class EditorWindow(QWidget):
             self.set_sepia()
 
     def set_sepia(self):
-        opened_img = QImage(self.img_path).scaled(500, 300, Qt.KeepAspectRatio, Qt.SmoothTransformation)
-        width = opened_img.width()
-        height = opened_img.height()
-        new_image = opened_img.copy()
+        width = self.edited.width()
+        height = self.edited.height()
+        new_image = self.edited.copy()
         print(new_image.pixelFormat())
         for x in range(width):
             for y in range(height):
                 # Creates new RGB value for sepia filter
                 rgb = QColor(new_image.pixelColor(x, y))
-                r = int(rgb.red() * .393) + int(rgb.green() * .769) + int(rgb.blue() * .189)
-                g = int(rgb.red() * .349) + int(rgb.green() * .686) + int(rgb.blue() * .168)
-                b = int(rgb.red() * .272) + int(rgb.green() * .534) + int(rgb.blue() * .131)
+                r = min(255, int(rgb.red() * .393) + int(rgb.green() * .769) + int(rgb.blue() * .189))
+                g = min(255, int(rgb.red() * .349) + int(rgb.green() * .686) + int(rgb.blue() * .168))
+                b = min(255, int(rgb.red() * .272) + int(rgb.green() * .534) + int(rgb.blue() * .131))
 
                 new_image.setPixel(x, y, qRgb(r, g, b))
 
         # new_image.save("test.jpg")
         new_pm = QPixmap().fromImage(new_image)
+        self.edited = new_image.copy()
 
         self.edited_image.setPixmap(new_pm)
 
     def set_brightness_levels(self):
-        opened_img = QImage(self.img_path).scaled(500, 300, Qt.KeepAspectRatio, Qt.SmoothTransformation)
-        width = opened_img.width()
-        height = opened_img.height()
-        new_image = opened_img.copy()
+        width = self.edited.width()
+        height = self.edited.height()
+        new_image = self.edited.copy()
 
         for x in range(width):
             for y in range(height):
                 # Creates new RGB value for sepia filter
-                rgb = QColor(opened_img.pixelColor(x, y))
+                rgb = QColor(self.edited.pixelColor(x, y))
                 r = min(255, rgb.red() * ((self.bright_slider.value() / 100) * 2))
                 g = min(255, rgb.green() * ((self.bright_slider.value() / 100) * 2))
                 b = min(255, rgb.blue() * ((self.bright_slider.value() / 100) * 2))
@@ -149,6 +151,7 @@ class EditorWindow(QWidget):
                 new_image.setPixel(x, y, qRgb(r, g, b))
 
         # new_image.save("test.jpg")
+        self.edited = new_image.copy()
         new_pm = QPixmap().fromImage(new_image)
 
         self.edited_image.setPixmap(new_pm)
