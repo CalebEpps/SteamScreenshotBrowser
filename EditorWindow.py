@@ -1,3 +1,4 @@
+import os
 import sys
 
 import cv2
@@ -7,7 +8,8 @@ import skimage.exposure
 from PySide2.QtCore import Qt
 from PySide2.QtGui import QPixmap, QImage, QColor, qRgb
 from PySide2.QtWidgets import QApplication, QWidget, QPushButton, QGridLayout, QLabel, \
-    QHBoxLayout, QVBoxLayout, QComboBox, QSlider
+    QHBoxLayout, QVBoxLayout, QComboBox, QSlider, QLayout, QSizePolicy
+from CustomWorkerThread import Worker
 
 
 class EditorWindow(QWidget):
@@ -32,18 +34,19 @@ class EditorWindow(QWidget):
         self.editor_grid = None
         self.filter_label = None
         self.filter_dropdown = None
-        self.filters = ["Red", "Green", "Blue", "Sepia", "Vintage"]
+        self.filters = ["None", "Sharpen", "Sepia"]
         self.curr_filter = None
 
         ### Declarations for filter kernels
-        self.sepia_kernel = np.array(([0.272, 0.534, 0.131],
+        self.sepia_kernel = np.matrix(([[0.393, 0.769, 0.189],
                                       [0.349, 0.686, 0.168],
-                                      [0.393, 0.769, 0.189]))
-        self.sharpen_kernel = np.array(([-1, -1, -1],
+                                      [0.272, 0.534, 0.131]]))
+        self.sharpen_kernel = np.matrix(([[-1, -1, -1],
                                         [-1, 9, -1],
-                                        [-1, -1, -1]))
+                                        [-1, -1, -1]]))
 
         # Tracks Slider Values (Allows manipulation before running filters)
+        # Will be used to export images
         self.brightness_lvl = 0
         self.contrast_lvl = 0
 
@@ -68,7 +71,6 @@ class EditorWindow(QWidget):
 
     def show(self):
         # Can format main window here too
-        self.setFixedSize(1000, 400)
         super().show()
 
     def create_preview_layout(self):
@@ -77,13 +79,13 @@ class EditorWindow(QWidget):
         self.original_image_lbl = QLabel()
         self.original_image_lbl.setPixmap(QPixmap(self.img_path))
         self.original_image_lbl.setPixmap(
-            QPixmap((self.img_path)).scaled(500, 350, Qt.KeepAspectRatio, Qt.SmoothTransformation))
+            QPixmap((self.img_path)).scaled(600, 400, Qt.KeepAspectRatio, Qt.SmoothTransformation))
         self.original_image_lbl.setScaledContents(False)
         self.image_preview_layout.addWidget(self.original_image_lbl)
 
         self.edited_image_lbl = QLabel()
         self.edited_image_lbl.setPixmap(
-            QPixmap(self.img_path).scaled(500, 350, Qt.KeepAspectRatio, Qt.SmoothTransformation))
+            QPixmap(self.img_path).scaled(600, 400, Qt.KeepAspectRatio, Qt.SmoothTransformation))
         self.edited_image_lbl.setScaledContents(False)
         self.image_preview_layout.addWidget((self.edited_image_lbl))
 
@@ -131,8 +133,10 @@ class EditorWindow(QWidget):
         self.footer_hbox.addWidget(self.cancel_btn)
 
         self.open_export_btn = QPushButton("Export")
+        self.open_export_btn.clicked.connect(self.on_export)
         self.footer_hbox.addWidget(self.open_export_btn)
         self.bulk_apply_btn = QPushButton("Bulk Apply")
+        self.bulk_apply_btn.clicked.connect(self.on_bulk_apply)
         self.footer_hbox.addWidget(self.bulk_apply_btn)
 
         self.main_layout.addLayout(self.footer_hbox)
@@ -145,21 +149,40 @@ class EditorWindow(QWidget):
             to set at the label.
         """
         self.tmp = cv2_img
-        cv2_img = imutils.resize(cv2_img, width=500)
+        cv2_img = imutils.resize(cv2_img, width=600)
         frame = cv2.cvtColor(cv2_img, cv2.COLOR_BGR2RGB)
         q_image = QImage(frame, frame.shape[1], frame.shape[0], frame.strides[0], QImage.Format_RGB888)
         label.setPixmap(QPixmap.fromImage(q_image))
 
     def on_filter_changed(self):
+        if self.curr_filter == self.filter_dropdown.currentText():
+            self.curr_filter = None
         self.curr_filter = self.filter_dropdown.currentText()
         self.update_changes()
 
     def set_filter(self, filter):
-        if filter == "Sepia":
-            return cv2.filter2D(self.edited_cv_img, kernel=self.sepia_kernel)
+        # Convert to proper forma, use numpy
+        img = cv2.cvtColor(self.edited_cv_img, cv2.COLOR_BGR2RGB)
+        img = np.array(img, dtype=np.float64)
 
-    def set_brightness_levels(self):
-        hsv = cv2.cvtColor(self.edited_cv_img, cv2.COLOR_BGR2HSV)
+
+        # Simply determine which filter to use
+        if filter == "Sepia":
+            img = cv2.transform(img, self.sepia_kernel)
+        elif filter == "Sharpen":
+            img = cv2.filter2D(self.edited_cv_img, -1, self.sharpen_kernel)
+        elif filter == "None":
+            img = self.original_cv_img
+
+        # Clip Values and convert back to uint8 format for cv
+        # Also, convert back from RGB to BGR
+        img[np.where(img > 255)] = 255
+        img = np.array(img, dtype=np.uint8)
+        img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
+        return img
+
+    def set_brightness_levels(self, img):
+        hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
         h, s, v = cv2.split(hsv)
         v = cv2.add(v, self.brightness_lvl)
         v[v > 255] = 255
@@ -182,12 +205,26 @@ class EditorWindow(QWidget):
 
     def update_changes(self):
         # This method should iterate over ALL changes and apply them. Maybe only apply them if they've been updated?
-        img = self.set_brightness_levels()
+        img = self.edited_cv_img
+        if self.curr_filter is not None:
+            img = self.set_filter(self.curr_filter)
+        img = self.set_brightness_levels(img=img)
         self.set_label(img, self.edited_image_lbl)
 
     def on_export(self):
         # Here load the cv2 img again and rerun all current values on it.
-        final_img = cv2.imread(self.img_path, cv2.COLOR_RGB)
+        # TODO: Allow user to choose file path. Do this HERE IN THE EDITOR UI
+        # Do NOT create a separate file or class. Make widget and show it.
+        final_img = cv2.imread(self.img_path)
+        if self.curr_filter is not None:
+            final_img = self.set_filter((self.curr_filter))
+        final_img = self.set_brightness_levels(final_img)
+        cv2.imwrite("cache/test/test_img.jpg", final_img)
+
+    def on_bulk_apply(self):
+        screenshot_dir = str(os.path.dirname(self.img_path))
+        for x in os.listdir(screenshot_dir):
+            print(x)
 
 
 if __name__ == "__main__":

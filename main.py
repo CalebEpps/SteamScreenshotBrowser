@@ -1,50 +1,17 @@
 import os
 import sys
-import traceback
 import urllib.request
 from functools import partial
 
-from PySide2.QtCore import QRunnable, Slot, Signal, QObject, QThreadPool
 from PySide2.QtCore import QSize, Qt
+from PySide2.QtCore import QThreadPool
 from PySide2.QtGui import QPixmap, QImage
 from PySide2.QtWidgets import QApplication, QWidget, QMainWindow, QPushButton, QGridLayout, QLabel, \
     QScrollArea, QHBoxLayout, QProgressBar, QProgressDialog, QVBoxLayout, QSizePolicy
+
+from CustomWorkerThread import Worker
 from EditorWindow import EditorWindow
 from SteamAppAPI import SteamApp
-
-class WorkerSignals(QObject):
-    finished = Signal()
-    error = Signal(tuple)
-    progress = Signal(int)
-    result = Signal(object)
-
-
-class Worker(QRunnable, QObject):
-    def __init__(self, function, *args, **kwargs):
-        super(Worker, self).__init__()
-        self.running_function = function
-        self.args = args
-        self.kwargs = kwargs
-        self.signals = WorkerSignals()
-
-        self.kwargs['progress'] = self.signals.progress
-
-    @Slot()
-    def run(self):
-        try:
-            print("Try")
-            result = self.running_function(*self.args, **self.kwargs)
-        except NotImplementedError:
-            print("error")
-            traceback.print_exc()
-            exctype, value = sys.exc_info()[:2]
-            self.signals.error.emit((exctype, value, traceback.format_exc()))
-        else:
-            print("else")
-            self.signals.result.emit(result)
-        finally:
-            print("Finally")
-            self.signals.finished.emit()
 
 
 # It creates a window with a scrollable grid of images.
@@ -74,6 +41,8 @@ class ScreenshotBrowser(QMainWindow):
         # Main Window Attributes
         self.setWindowTitle("Sing's Screenshot Browser")
         self.setMinimumSize(1280, 720)
+        self.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
+        self.setMaximumSize(1280, 720)
         # Makes the background look better
         palette = self.palette()
         palette.setColor(self.backgroundRole(), Qt.black)
