@@ -13,17 +13,20 @@ class SteamApp:
         self.app_id = str(app_id)
 
         # If cached item exists, load it. Otherwise, send and receive request
-        if os.path.exists('./cache/' + self.app_id + ".json"):
-            cached_file = ('./cache/' + self.app_id + ".json")
+        if os.path.exists(f'./cache/{self.app_id}.json'):
+            cached_file = f'./cache/{self.app_id}.json'
 
             with open(cached_file) as file:
                 self.r = json.loads(file.read())
                 file.close()
         else:
             self.r = json.loads(
-                requests.get(("https://store.steampowered.com/api/appdetails?appids=" + self.app_id)).text)
+                requests.get(
+                    f'https://www.store.steampowered.com/api/appdetails?appids={self.app_id}'
+                ).text
+            )
 
-            with open('./cache/' + self.app_id + '.json', 'w') as file:
+            with open(f'./cache/{self.app_id}.json', 'w') as file:
                 file.write(json.dumps(self.r))  # Need to write in proper json
                 file.close()
 

@@ -1,3 +1,4 @@
+import contextlib
 import os
 import sys
 import urllib.request
@@ -17,7 +18,7 @@ from SteamAppAPI import SteamApp
 # It creates a window with a scrollable grid of images.
 class ScreenshotBrowser(QMainWindow):
 
-    def __init__(self, steam_user_id):
+    def __init__(self, steam_path):
         super().__init__()
         # Declarations
         self.title_label = None
@@ -33,8 +34,8 @@ class ScreenshotBrowser(QMainWindow):
         self.loading_box = QProgressDialog()
         self.loading_bar = QProgressBar()
         self.counter_test = 0
-        self.steam_user_id = str(steam_user_id)
-        self.steam_screenshot_path = f"C:/Program Files (x86)/Steam/userdata/{self.steam_user_id}/760/remote/"
+        self.steam_path = str(steam_path)
+        self.steam_screenshot_path = f"{self.steam_path}/760/remote/"
         self.titles = self.get_app_ids_from_screenshot_folder()
         print(self.titles)
 
@@ -70,10 +71,8 @@ class ScreenshotBrowser(QMainWindow):
             widget = self.home_grid.itemAt(x).widget()
             widget.setParent(None)
             widget.deleteLater()
-        try:
+        with contextlib.suppress(IndexError):
             self.build_game_grid(self.titles[index])
-        except IndexError:
-            pass
         self.resizeEvent(None)
 
     def img_clicked(self, img_path, event):
@@ -306,5 +305,5 @@ class ScreenshotBrowser(QMainWindow):
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
-    window = ScreenshotBrowser(steam_user_id=100834795)
+    window = ScreenshotBrowser(steam_path=100834795)
     app.exec_()

@@ -4,7 +4,6 @@ import sys
 import cv2
 import imutils
 import numpy as np
-import skimage.exposure
 from PySide2.QtCore import Qt
 from PySide2.QtGui import QPixmap, QImage, QColor, qRgb
 from PySide2.QtWidgets import QApplication, QWidget, QPushButton, QGridLayout, QLabel, \
@@ -211,14 +210,20 @@ class EditorWindow(QWidget):
         img = self.set_brightness_levels(img=img)
         self.set_label(img, self.edited_image_lbl)
 
-    def on_export(self):
+    def on_export(self, img_path):
         # Here load the cv2 img again and rerun all current values on it.
         # TODO: Allow user to choose file path. Do this HERE IN THE EDITOR UI
         # Do NOT create a separate file or class. Make widget and show it.
-        final_img = cv2.imread(self.img_path)
+
+        final_img = cv2.imread(img_path)
+        print("Exported Image")
         if self.curr_filter is not None:
             final_img = self.set_filter((self.curr_filter))
         final_img = self.set_brightness_levels(final_img)
+
+        if not os.path.exists("cache/test"):
+            os.mkdir("cache/test")
+
         cv2.imwrite("cache/test/test_img.jpg", final_img)
 
     def on_bulk_apply(self):
