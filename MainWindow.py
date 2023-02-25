@@ -1,7 +1,7 @@
 import contextlib
 import os
 import sys
-import urllib.request
+import urllib.request, urllib.error
 from functools import partial
 
 from PySide2.QtCore import QSize, Qt
@@ -101,12 +101,10 @@ class ScreenshotBrowser(QMainWindow):
             widget = self.home_grid.itemAt(x).widget()
             widget.setParent(None)
             widget.deleteLater()
-        try:
+        with contextlib.suppress(IndexError):
             self.build_home_grid()
             self.setCentralWidget(self.main_widget)
             self.resizeEvent(None)
-        except IndexError:
-            pass
 
 
 
@@ -242,11 +240,16 @@ class ScreenshotBrowser(QMainWindow):
     @staticmethod
     def load_pixmap_for_home(steam_api):
         img_path = "cache/image_cache/" + steam_api.get("name").replace(":", "") + "_header.jpg"
-        if not os.path.exists(img_path):
-            header_link = steam_api.get("header_image")
-            urllib.request.urlretrieve(header_link, img_path)
-            print(img_path)
-        return img_path
+        try:
+            if not os.path.exists(img_path):
+                header_link = steam_api.get("header_image")
+                print(header_link)
+                urllib.request.urlretrieve(header_link, img_path)
+                print(img_path)
+            return img_path
+        except urllib.error.URLError as e:
+            print(e)
+            return "no_header.jpg"
 
     # Loads screenshot links from directory based on app id
     def load_screenshots_for_game(self, app_id):

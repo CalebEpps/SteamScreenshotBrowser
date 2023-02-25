@@ -1,3 +1,4 @@
+import configparser
 import os
 import sys
 
@@ -96,6 +97,7 @@ class EditorWindow(QWidget):
 
         # Create filter area and add to editor grid
         self.filter_label = QLabel("Filters")
+        self.filter_label.setStyleSheet('color: white')
         # Dropdown Setup
         self.filter_dropdown = QComboBox()
         self.filter_dropdown.addItems(self.filters)
@@ -106,6 +108,7 @@ class EditorWindow(QWidget):
 
         # Set up Brightness Editor and add to grid
         self.bright_label = QLabel("Brightness")
+        self.bright_label.setStyleSheet('color: white')
 
         self.bright_slider = QSlider(Qt.Horizontal)
         self.bright_slider.setValue(25)
@@ -116,6 +119,7 @@ class EditorWindow(QWidget):
 
         # Set up Contrast Editor and add to grid
         self.con_label = QLabel("Contrast")
+        self.con_label.setStyleSheet('color: white')
 
         self.con_slider = QSlider(Qt.Horizontal)
         self.con_slider.setRange(1, 100)
@@ -132,7 +136,7 @@ class EditorWindow(QWidget):
         self.footer_hbox.addWidget(self.cancel_btn)
 
         self.open_export_btn = QPushButton("Export")
-        self.open_export_btn.clicked.connect(self.on_export)
+        self.open_export_btn.clicked.connect(lambda: self.on_export(self.img_path))
         self.footer_hbox.addWidget(self.open_export_btn)
         self.bulk_apply_btn = QPushButton("Bulk Apply")
         self.bulk_apply_btn.clicked.connect(self.on_bulk_apply)
@@ -210,6 +214,9 @@ class EditorWindow(QWidget):
         img = self.set_brightness_levels(img=img)
         self.set_label(img, self.edited_image_lbl)
 
+    def on_export_clicked(self):
+        pass
+
     def on_export(self, img_path):
         # Here load the cv2 img again and rerun all current values on it.
         # TODO: Allow user to choose file path. Do this HERE IN THE EDITOR UI
@@ -218,7 +225,7 @@ class EditorWindow(QWidget):
         final_img = cv2.imread(img_path)
         print("Exported Image")
         if self.curr_filter is not None:
-            final_img = self.set_filter((self.curr_filter))
+            final_img = self.set_filter(self.curr_filter)
         final_img = self.set_brightness_levels(final_img)
 
         if not os.path.exists("cache/test"):

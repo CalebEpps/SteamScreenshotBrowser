@@ -22,7 +22,7 @@ class SteamApp:
         else:
             self.r = json.loads(
                 requests.get(
-                    f'https://www.store.steampowered.com/api/appdetails?appids={self.app_id}'
+                    f'https://store.steampowered.com/api/appdetails?appids={self.app_id}'
                 ).text
             )
 

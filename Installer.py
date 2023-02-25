@@ -66,7 +66,8 @@ class Installer(QWidget):
 
         parser = ConfigParser()
         parser["INFO"] = {
-            "path": f"{self.steam_path}/{self.steam_id}"
+            "path": f"{self.steam_path}/{self.steam_id}",
+            "export_path": "export/"
         }
 
         with open("cache/steam_info.config", 'w') as config:
